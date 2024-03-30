@@ -2,6 +2,7 @@ import os
 from . import data
 
 def write_tree(directory='.'):
+    entries = []
     with os.scandir(directory) as it:
         for entry in it:
             full = os.path.join(directory, entry.name)
@@ -9,12 +10,18 @@ def write_tree(directory='.'):
                 continue
 
             if entry.is_file(follow_symlinks=False):
+                type_ = 'blob'
                 with open (full, 'rb') as f:
-                    print (data.hash_object (f.read ()), full)
+                    oid = data.hash_object (f.read (), type_)
             elif entry.is_dir(follow_symlinks=False):
-                write_tree(full)
+                type_ = 'tree'
+                oid = write_tree (full)
+            entries.append (f'{entry.name}\x00{type_}\x00{oid}')
 
-    # TODO actually create the tree object
+    tree = ''.join(f'{type} {oid} {name}\n' 
+                   for name, type, oid 
+                   in sorted(entries)).encode()
+    return data.hash_object (tree.encode(), 'tree')
                 
 def is_ignored(path):
     return '.ugit' in path.split(os.sep)
